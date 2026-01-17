@@ -118,6 +118,10 @@ class Rss_Action extends Typecho_Widget implements Widget_Interface_Do
         <?php foreach ($posts as $post):
             $content = $post['text'];
 
+            // 兼容部分编辑器/输入法：文章开头的标题写成“#标题”（缺少空格）时不会被 Markdown 识别
+            $content = preg_replace('/\A\x{FEFF}/u', '', $content);
+            $content = preg_replace('/\A([ \t\x{3000}]*)((?:#{1,6}))([^\s#])/u', '$1$2 $3', $content);
+
             // 解析 Markdown
             if (strpos($post['type'], '_markdown') !== false || $post['type'] == 'post') {
                 $content = Markdown::convert($content);
