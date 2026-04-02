@@ -4,7 +4,7 @@
  *
  * @package RSS Styling
  * @author TypechoTeam
- * @version 1.1.0
+ * @version 1.1.1
  * @link http://www.typecho.team
  */
 class Rss_Plugin implements Typecho_Plugin_Interface
@@ -18,10 +18,17 @@ class Rss_Plugin implements Typecho_Plugin_Interface
      */
     public static function activate()
     {
-        // 移除 Typecho 原生的 feed 路由
+        Helper::removeRoute(self::styledFeedRouteName());
         Helper::removeRoute('feed');
 
-        // 添加自定义路由，接管 /feed
+        if (self::supportsNativeFeedRoute()) {
+            // 仅优先接管 /feed，保留 Typecho 原生的 /feed/rss/、/feed/atom/、评论 feed 等变体
+            Helper::addRoute(self::styledFeedRouteName(), '/feed', 'Rss_Action', 'styledFeed');
+            self::restoreNativeFeedRoute(self::styledFeedRouteName());
+            return;
+        }
+
+        // 旧版 Typecho 兼容：直接接管 /feed
         Helper::addRoute('feed', '/feed', 'Rss_Action', 'styledFeed');
     }
 
@@ -35,10 +42,9 @@ class Rss_Plugin implements Typecho_Plugin_Interface
      */
     public static function deactivate()
     {
+        Helper::removeRoute(self::styledFeedRouteName());
         Helper::removeRoute('feed');
-
-        // 恢复 Typecho 原生的 feed 路由
-        Helper::addRoute('feed', '/feed', 'Widget_Archive', 'feed');
+        self::restoreNativeFeedRoute();
     }
 
     /**
@@ -115,4 +121,40 @@ class Rss_Plugin implements Typecho_Plugin_Interface
      * @return void
      */
     public static function personalConfig(Typecho_Widget_Helper_Form $form){}
+
+    /**
+     * 是否支持 Typecho 1.3+ 的原生 Feed 组件
+     *
+     * @return bool
+     */
+    private static function supportsNativeFeedRoute()
+    {
+        return class_exists('\\Widget\\Feed');
+    }
+
+    /**
+     * 恢复 Typecho 原生 feed 路由
+     *
+     * @param string|null $after
+     * @return void
+     */
+    private static function restoreNativeFeedRoute($after = NULL)
+    {
+        if (self::supportsNativeFeedRoute()) {
+            Helper::addRoute('feed', '/feed[feed:string:0]', '\\Widget\\Feed', 'render', $after);
+            return;
+        }
+
+        Helper::addRoute('feed', '/feed', 'Widget_Archive', 'feed', $after);
+    }
+
+    /**
+     * 美化 feed 路由名称
+     *
+     * @return string
+     */
+    private static function styledFeedRouteName()
+    {
+        return 'rssStyledFeed';
+    }
 }

@@ -4,7 +4,7 @@
  *
  * @package Rss
  * @author Typecho
- * @version 1.0.0
+ * @version 1.1.1
  */
 class Rss_Action extends Typecho_Widget implements Widget_Interface_Do
 {
@@ -51,6 +51,7 @@ class Rss_Action extends Typecho_Widget implements Widget_Interface_Do
     {
         $config = $this->options;
         $options = Helper::options();
+        $feedUrl = Typecho_Common::url('/feed', $options->index);
 
         // 获取文章数量配置
         $feedCount = isset($config->feedCount) && is_numeric($config->feedCount)
@@ -75,13 +76,15 @@ class Rss_Action extends Typecho_Widget implements Widget_Interface_Do
         $copyright = isset($config->copyright) ? $config->copyright : '';
 
         // 设置 header
-        $this->response->setContentType('application/xml; charset=UTF-8');
+        $this->response->setContentType('application/rss+xml');
 
         // 获取文章
         $posts = $this->db->fetchAll(
             $this->db->select()->from('table.contents')
                 ->where('table.contents.status = ?', 'publish')
                 ->where('table.contents.type = ?', 'post')
+                ->where('table.contents.allowFeed = ?', 1)
+                ->where("table.contents.password IS NULL OR table.contents.password = ''")
                 ->where('table.contents.created <= ?', time())
                 ->order('table.contents.created', Typecho_Db::SORT_DESC)
                 ->limit($feedCount)
@@ -108,8 +111,8 @@ class Rss_Action extends Typecho_Widget implements Widget_Interface_Do
     xmlns:atom="http://www.w3.org/2005/Atom">
     <channel>
         <title><?php echo htmlspecialchars($options->title); ?></title>
-        <link><?php echo $options->siteUrl; ?></link>
-        <atom:link href="<?php echo $options->siteUrl; ?>feed" rel="self" type="application/rss+xml" />
+        <link><?php echo htmlspecialchars($options->siteUrl); ?></link>
+        <atom:link href="<?php echo htmlspecialchars($feedUrl); ?>" rel="self" type="application/rss+xml" />
         <description><?php echo htmlspecialchars($options->description); ?></description>
         <language>zh-CN</language>
         <lastBuildDate><?php echo date(DATE_RFC822, time()); ?></lastBuildDate>
@@ -143,11 +146,7 @@ class Rss_Action extends Typecho_Widget implements Widget_Interface_Do
                 $content .= '<hr/>' . $copyright;
             }
 
-            // 获取文章链接
-            $routeExists = (NULL != Typecho_Router::get('post'));
-            $permalink = $routeExists ? Typecho_Router::url('post',
-                array('cid' => $post['cid']), $options->siteUrl)
-                : $options->siteUrl . '?p=' . $post['cid'];
+            $permalink = $this->getPostPermalink($post, $options);
 
             $w = date('w', $post['created']);
             $dateFormatted = date('Y', $post['created']) . '年' .
@@ -157,8 +156,8 @@ class Rss_Action extends Typecho_Widget implements Widget_Interface_Do
         ?>
         <item>
             <title><?php echo htmlspecialchars($post['title']); ?></title>
-            <link><?php echo $permalink; ?></link>
-            <guid isPermaLink="true"><?php echo $permalink; ?></guid>
+            <link><?php echo htmlspecialchars($permalink); ?></link>
+            <guid isPermaLink="true"><?php echo htmlspecialchars($permalink); ?></guid>
             <pubDate><?php echo date(DATE_RFC822, $post['created']); ?></pubDate>
             <pubDateFormatted><?php echo $dateFormatted; ?></pubDateFormatted>
             <dc:creator><?php echo htmlspecialchars($options->title); ?></dc:creator>
@@ -181,5 +180,44 @@ class Rss_Action extends Typecho_Widget implements Widget_Interface_Do
     {
         $this->on($this->request->is('do=feed'))->feed();
         $this->on($this->request->is('do=styledFeed'))->styledFeed();
+    }
+
+    /**
+     * 使用 Typecho 原生 permalink 逻辑生成文章链接，避免残留 {slug} 等占位符
+     *
+     * @param array $post
+     * @param mixed $options
+     * @return string
+     */
+    private function getPostPermalink(array $post, $options)
+    {
+        $route = Typecho_Router::get('post');
+        if (NULL != $route) {
+            $params = array(
+                'cid' => $post['cid'],
+                'slug' => $post['slug'],
+                'year' => date('Y', $post['created']),
+                'month' => date('m', $post['created']),
+                'day' => date('d', $post['created'])
+            );
+
+            $routeParams = isset($route['params']) && is_array($route['params'])
+                ? $route['params']
+                : array();
+
+            if (empty(array_diff($routeParams, array_keys($params)))) {
+                return Typecho_Router::url('post', $params, $options->siteUrl);
+            }
+        }
+
+        if (method_exists('Helper', 'widgetById')) {
+            $content = Helper::widgetById('contents', intval($post['cid']));
+
+            if ($content && !empty($content->permalink)) {
+                return $content->permalink;
+            }
+        }
+
+        return $options->siteUrl . '?p=' . $post['cid'];
     }
 }
