@@ -75,8 +75,9 @@ class Rss_Action extends Typecho_Widget implements Widget_Interface_Do
         // 版权信息
         $copyright = isset($config->copyright) ? $config->copyright : '';
 
-        // 设置 header
-        $this->response->setContentType('application/rss+xml');
+        // 浏览器要应用 xml-stylesheet，响应需要按 XML 返回；
+        // 纯 RSS 输出时仍保留 application/rss+xml 以兼容阅读器。
+        $this->response->setContentType($addStyle ? 'text/xml' : 'application/rss+xml');
 
         // 获取文章
         $posts = $this->db->fetchAll(
@@ -91,13 +92,11 @@ class Rss_Action extends Typecho_Widget implements Widget_Interface_Do
         );
 
         // 构建 RSS
-        echo '<?xml version="1.0" encoding="UTF-8"?>';
+        echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
 
         if ($addStyle) {
-            echo '<?xml-stylesheet type="text/xsl" href="' . $options->pluginUrl . '/Rss/rss-' . $styleTheme . '.xsl"?>';
+            echo '<?xml-stylesheet type="text/xsl" href="' . $options->pluginUrl . '/Rss/rss-' . $styleTheme . '.xsl"?>' . "\n";
         }
-
-        echo "\n";
 
         $w = date('w');
         $lastBuildDateFormatted = date('Y', time()) . '年' .
