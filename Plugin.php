@@ -4,7 +4,7 @@
  *
  * @package RSS Styling
  * @author TypechoTeam
- * @version 1.1.1
+ * @version 1.1.2
  * @link http://www.typecho.team
  */
 class Rss_Plugin implements Typecho_Plugin_Interface
