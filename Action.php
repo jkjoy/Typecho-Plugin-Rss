@@ -109,10 +109,10 @@ class Rss_Action extends Typecho_Widget implements Widget_Interface_Do
     xmlns:dc="http://purl.org/dc/elements/1.1/"
     xmlns:atom="http://www.w3.org/2005/Atom">
     <channel>
-        <title><?php echo htmlspecialchars($options->title); ?></title>
-        <link><?php echo htmlspecialchars($options->siteUrl); ?></link>
-        <atom:link href="<?php echo htmlspecialchars($feedUrl); ?>" rel="self" type="application/rss+xml" />
-        <description><?php echo htmlspecialchars($options->description); ?></description>
+        <title><?php echo $this->escapeXml($options->title); ?></title>
+        <link><?php echo $this->escapeXml($options->siteUrl); ?></link>
+        <atom:link href="<?php echo $this->escapeXml($feedUrl); ?>" rel="self" type="application/rss+xml" />
+        <description><?php echo $this->escapeXml($options->description); ?></description>
         <language>zh-CN</language>
         <lastBuildDate><?php echo date(DATE_RFC822, time()); ?></lastBuildDate>
         <lastBuildDateFormatted><?php echo $lastBuildDateFormatted; ?></lastBuildDateFormatted>
@@ -154,12 +154,12 @@ class Rss_Action extends Typecho_Widget implements Widget_Interface_Do
                            date('H:i', $post['created']);
         ?>
         <item>
-            <title><?php echo htmlspecialchars($post['title']); ?></title>
-            <link><?php echo htmlspecialchars($permalink); ?></link>
-            <guid isPermaLink="true"><?php echo htmlspecialchars($permalink); ?></guid>
+            <title><?php echo $this->escapeXml($post['title']); ?></title>
+            <link><?php echo $this->escapeXml($permalink); ?></link>
+            <guid isPermaLink="true"><?php echo $this->escapeXml($permalink); ?></guid>
             <pubDate><?php echo date(DATE_RFC822, $post['created']); ?></pubDate>
             <pubDateFormatted><?php echo $dateFormatted; ?></pubDateFormatted>
-            <dc:creator><?php echo htmlspecialchars($options->title); ?></dc:creator>
+            <dc:creator><?php echo $this->escapeXml($options->title); ?></dc:creator>
             <description><![CDATA[<?php echo $content; ?>]]></description>
             <content:encoded><![CDATA[<?php echo $content; ?>]]></content:encoded>
         </item>
@@ -218,5 +218,18 @@ class Rss_Action extends Typecho_Widget implements Widget_Interface_Do
         }
 
         return $options->siteUrl . '?p=' . $post['cid'];
+    }
+
+    /**
+     * 输出 XML 文本/属性前先还原已有 HTML 实体，避免 &amp; 被二次编码成 &amp;amp;。
+     *
+     * @param mixed $value
+     * @return string
+     */
+    private function escapeXml($value)
+    {
+        $value = html_entity_decode((string) $value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        return htmlspecialchars($value, ENT_QUOTES | ENT_XML1, 'UTF-8');
     }
 }
